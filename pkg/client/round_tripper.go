@@ -39,13 +39,12 @@ func NewClusterRoundTripper(delegate http.RoundTripper) *ClusterRoundTripper {
 
 func (c *ClusterRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	cluster, ok := ClusterFromContext(req.Context())
-	if !ok {
-		return nil, fmt.Errorf("expected cluster in context")
+	if ok {
+		//return nil, fmt.Errorf("expected cluster in context")
+		req = req.Clone(req.Context())
+		req.URL.Path = generatePath(req.URL.Path, cluster)
+		req.URL.RawPath = generatePath(req.URL.RawPath, cluster)
 	}
-	req = req.Clone(req.Context())
-	req.URL.Path = generatePath(req.URL.Path, cluster)
-	req.URL.RawPath = generatePath(req.URL.RawPath, cluster)
-
 	return c.delegate.RoundTrip(req)
 }
 
@@ -70,7 +69,7 @@ func generatePath(originalPath string, cluster logicalcluster.Name) string {
 
 	// finally append the original path
 	path += originalPath
-	
+
 	return path
 }
 
@@ -82,7 +81,10 @@ const (
 
 // WithCluster injects a cluster name into a context
 func WithCluster(ctx context.Context, cluster logicalcluster.Name) context.Context {
-	return context.WithValue(ctx, keyCluster, cluster)
+	if cluster.String() != "" {
+		return context.WithValue(ctx, keyCluster, cluster)
+	}
+	return ctx
 }
 
 // ClusterFromContext extracts a cluster name from the context
